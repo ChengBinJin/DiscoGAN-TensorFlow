@@ -12,7 +12,8 @@ FLAGS = tf.flags.FLAGS
 
 tf.flags.DEFINE_string('gpu_index', '0', 'gpu index if you have multiple gpus, default: 0')
 tf.flags.DEFINE_integer('batch_sizse', 256, 'batch size, default: 256')
-tf.flags.DEFINE_string('dataset', 'bag2shoes', 'dataset name, default bag2shoes')
+tf.flags.DEFINE_string('dataset', 'edges2handbags', 'dataset name from [edges2handbags, edges2shoes, handbags2shoes],'
+                                                    ' default bag2shoes')
 tf.flags.DEFINE_bool('is_train', True, 'training or inference mode, default: True')
 
 tf.flags.DEFINE_float('learning_rate', 2e-4, 'initial learning rate for Adam, default: 0.0002')
