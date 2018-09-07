@@ -17,7 +17,8 @@ tf.flags.DEFINE_string('dataset', 'edges2handbags', 'dataset name from [edges2ha
 tf.flags.DEFINE_bool('is_train', True, 'training or inference mode, default: True')
 
 tf.flags.DEFINE_float('learning_rate', 2e-4, 'initial learning rate for Adam, default: 0.0002')
-tf.flags.DEFINE_float('beta1', 0.5, 'momentum term of Adam, default: 0.5')
+tf.flags.DEFINE_float('beta1', 0.5, 'beta1 momentum term of Adam, default: 0.5')
+tf.flags.DEFINE_float('beta2', 0.999, 'beta2 momentum term of Adam, default: 0.999')
 tf.flags.DEFINE_integer('iters', 200000, 'number of iterations, default: 200000')
 tf.flags.DEFINE_integer('print_freq', 100, 'print frequency for loss, default: 100')
 tf.flags.DEFINE_integer('save_freq', 1000, 'save frequency for model, default: 1000')
