@@ -133,7 +133,7 @@ class DiscoGAN(object):
         fake_y, fake_x = self.sess.run([self.fake_y_sample, self.fake_x_sample],
                                        feed_dict={self.x_test_tfph: batch_x, self.y_test_tfph: batch_y})
 
-        return [batch_x, fake_x, batch_y, fake_y]
+        return [batch_x, fake_y, batch_y, fake_x]
 
     def test_step(self, x_img, y_img):
         fake_y = self.sess.run(self.fake_y_sample, feed_dict={self.x_test_tfph: x_img})
