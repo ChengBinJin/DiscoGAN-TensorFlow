@@ -11,7 +11,7 @@ from datetime import datetime
 
 # noinspection PyPep8Naming
 from dataset import Dataset
-from discogan import discoGAN
+from discogan import DiscoGAN
 
 
 class Solver(object):
@@ -22,13 +22,13 @@ class Solver(object):
 
         self.flags = flags
         self.dataset = Dataset(self.flags.dataset, self.flags)
-        self.model = discoGAN(self.sess, self.flags, self.dataset.image_size, self.dataset())
+        self.model = DiscoGAN(self.sess, self.flags, self.dataset.image_size, self.dataset())
 
         self._make_folders()
         self.iter_time = 0
 
         self.saver = tf.train.Saver()
-        self.sess.run(tf.global_variables_initializer())
+        self.sess.run([tf.global_variables_initializer(), tf.local_variables_initializer()])
 
         # tf_utils.show_all_variables()
 
@@ -85,7 +85,6 @@ class Solver(object):
                 self.iter_time += 1
 
             self.save_model(self.flags.iters)
-
         except KeyboardInterrupt:
             coord.request_stop()
         except Exception as e:
@@ -101,14 +100,15 @@ class Solver(object):
         else:
             print(' [!] Load Failed...')
 
-        num_iters = 20
         total_time = 0.
+        num_iters = self.dataset.data_x.shape[0]
         for iter_time in range(num_iters):
             print('iter_time: {}'.format(iter_time))
+            img_x, img_y = self.dataset.data_x[iter_time], self.dataset.data_y[iter_time]
 
             # measure inference time
             start_time = time.time()
-            imgs = self.model.sample_imgs()  # inference
+            imgs = self.model.test_step(np.expand_dims(img_x, axis=0), np.expand_dims(img_y, axis=0)) # inference
             total_time += time.time() - start_time
             self.model.plots(imgs, iter_time, self.test_out_dir)
 
