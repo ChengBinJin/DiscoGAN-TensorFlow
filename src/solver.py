@@ -102,13 +102,14 @@ class Solver(object):
 
         total_time = 0.
         num_iters = self.dataset.data_x.shape[0]
-        for iter_time in range(num_iters):
+        for iter_time in range(0, num_iters, self.flags.sample_batch):
             print('iter_time: {}'.format(iter_time))
-            img_x, img_y = self.dataset.data_x[iter_time], self.dataset.data_y[iter_time]
+            img_x = self.dataset.data_x[iter_time:iter_time+self.flags.sample_batch]
+            img_y = self.dataset.data_y[iter_time:iter_time+self.flags.sample_batch]
 
             # measure inference time
             start_time = time.time()
-            imgs = self.model.test_step(np.expand_dims(img_x, axis=0), np.expand_dims(img_y, axis=0)) # inference
+            imgs = self.model.test_step(img_x, img_y)  # inference
             total_time += time.time() - start_time
             self.model.plots(imgs, iter_time, self.test_out_dir)
 

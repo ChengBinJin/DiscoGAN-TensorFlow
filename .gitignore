@@ -1,3 +1,7 @@
 .idea
 src/.idea/
 src/__pycache__/
+src/edges2handbags
+src/handbags2shoes
+src/edges2shoes
+github_imgs
