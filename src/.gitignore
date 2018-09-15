@@ -5,3 +5,4 @@ edges2shoes
 jupyter/.ipynb_checkpoints
 jupyter/__pycache__
 jupyter/*.png
+jupyter/img/
