@@ -13,7 +13,7 @@ class Reader(object):
                  side='left', name=None):
         self.file_path = file_path
         self.image_size = image_size
-        self.factor = 1.1
+        self.factor = 1.05
         self.ori_image_size = (256, 256, 3)
         self.bigger_size = [int(np.ceil(self.ori_image_size[0] * self.factor)),
                             int(np.ceil(self.ori_image_size[1] * self.factor))]
@@ -56,8 +56,8 @@ class Reader(object):
         image = tf.image.random_flip_left_right(image, seed=random_seed)
         # resize to input image size
         image = tf.image.resize_images(image, size=(self.image_size[0], self.image_size[1]))
-        # normalize to [0, 1]
-        image = tf.image.convert_image_dtype(image, dtype=tf.float32) / 255.0
+        # normalize to [-1., 1.]
+        image = tf.image.convert_image_dtype(image, dtype=tf.float32) / 127.5 - 1.
         image.set_shape(self.image_size)
         return image
 

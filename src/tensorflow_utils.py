@@ -68,7 +68,6 @@ def upsampling2d(x, size=(2, 2), name='upsampling2d'):
 
 def linear(x, output_size, bias_start=0.0, with_w=False, name='fc'):
     shape = x.get_shape().as_list()
-    # print('shape: ', shape)
 
     with tf.variable_scope(name):
         matrix = tf.get_variable(name="matrix", shape=[shape[1], output_size],
@@ -230,7 +229,7 @@ def lrelu(x, leak=0.2, name='lrelu', is_print=False):
 
 
 def xavier_init(in_dim):
-    print('in_dim: ', in_dim)
+    # print('in_dim: ', in_dim)
     xavier_stddev = 1. / tf.sqrt(in_dim / 2.)
     return xavier_stddev
 

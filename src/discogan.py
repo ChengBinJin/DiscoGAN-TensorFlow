@@ -37,26 +37,38 @@ class DiscoGAN(object):
         self._tensorboard()
 
     def _build_net(self):
-        # tfph: tensorflow placeholder
-        self.x_test_tfph = tf.placeholder(tf.float32, shape=[None, *self.image_size], name='A_test_tfph')
-        self.y_test_tfph = tf.placeholder(tf.float32, shape=[None, *self.image_size], name='B_test_tfph')
+        if self.flags.dataset == 'handbags2shoes':
+            side_1, side_2 = 'right', 'right'
+            self.input_channel = 3
+            self.output_channel = 3
+        else:
+            side_1, side_2 = 'left', 'right'
+            self.input_channel = 1
+            self.output_channel = 3
 
-        self.G_gen = Generator(name='G', ngf=self.ngf, norm=self.norm, image_size=self.image_size,
+        # tfph: tensorflow placeholder
+        self.x_test_tfph = tf.placeholder(
+            tf.float32, shape=[None, self.image_size[0], self.image_size[1], self.input_channel], name='A_test_tfph')
+        self.y_test_tfph = tf.placeholder(
+            tf.float32, shape=[None, self.image_size[0], self.image_size[1], self.output_channel], name='B_test_tfph')
+
+        self.G_gen = Generator(name='G', ngf=self.ngf, norm=self.norm, output_channel=self.output_channel,
                                _ops=self._G_gen_train_ops)
         self.Dy_dis = Discriminator(name='Dy', ndf=self.ndf, norm=self.norm, _ops=self._Dy_dis_train_ops)
-        self.F_gen = Generator(name='F', ngf=self.ngf, norm=self.norm, image_size=self.image_size,
+        self.F_gen = Generator(name='F', ngf=self.ngf, norm=self.norm, output_channel=self.input_channel,
                                _ops=self._F_gen_train_ops)
         self.Dx_dis = Discriminator(name='Dx', ndf=self.ndf, norm=self.norm, _ops=self._Dx_dis_train_ops)
 
-        if self.flags.dataset == 'handbags2shoes':
-            side_1, side_2 = 'right', 'right'
-        else:
-            side_1, side_2 = 'left', 'right'
         x_reader = Reader(self.x_path, name='X', image_size=self.image_size, batch_size=self.flags.batch_size,
                           side=side_1)
         y_reader = Reader(self.y_path, name='Y', image_size=self.image_size, batch_size=self.flags.batch_size,
                           side=side_2)
-        self.x_imgs = x_reader.feed()
+
+        if self.input_channel == 1:
+            imgs = x_reader.feed()
+            _, self.x_imgs, _ = tf.split(imgs, [1, 1, 1], axis=3)
+        else:
+            self.x_imgs = x_reader.feed()
         self.y_imgs = y_reader.feed()
 
         # cycle consistency loss
@@ -161,8 +173,8 @@ class DiscoGAN(object):
         gs = gridspec.GridSpec(n_rows, n_cols)  # (row, column)
         gs.update(wspace=margin, hspace=margin)
 
-        # we don't need inverse transform, becasue discoGAN use sigmoid at the end of the generator
-        # imgs = [utils.inverse_transform(imgs[idx]) for idx in range(len(imgs))]
+        # transform [-1., 1.] to [0., 1.]
+        imgs = [utils.inverse_transform(imgs[idx]) for idx in range(len(imgs))]
 
         # save more bigger image
         for col_index in range(n_cols):
@@ -172,19 +184,25 @@ class DiscoGAN(object):
                 ax.set_xticklabels([])
                 ax.set_yticklabels([])
                 ax.set_aspect('equal')
-                plt.imshow((imgs[col_index][row_index]).reshape(
-                    self.image_size[0], self.image_size[1], self.image_size[2]), cmap='Greys_r')
+                if imgs[col_index][row_index].shape[2] == 1:  # gray scale
+                    img_2d = imgs[col_index][row_index]
+                    img_3d = np.dstack((img_2d, img_2d, img_2d))
+                    plt.imshow(img_3d.reshape(
+                        self.image_size[0], self.image_size[1], self.image_size[2]), cmap='Greys_r')
+                else:
+                    plt.imshow((imgs[col_index][row_index]).reshape(
+                        self.image_size[0], self.image_size[1], self.image_size[2]), cmap='Greys_r')
 
         plt.savefig(save_file + '/sample_{}.png'.format(str(iter_time)), bbox_inches='tight')
         plt.close(fig)
 
 
 class Generator(object):
-    def __init__(self, name=None, ngf=64, norm='instance', image_size=(64, 64, 3), _ops=None):
+    def __init__(self, name=None, ngf=64, norm='instance', output_channel=3, _ops=None):
         self.name = name
         self.ngf = ngf
         self.norm = norm
-        self.image_size = image_size
+        self.output_channel = output_channel
         self._ops = _ops
         self.reuse = False
 
@@ -226,9 +244,9 @@ class Generator(object):
             conv7 = tf_utils.norm(conv7, _type='batch', _ops=self._ops, name='conv7_norm')
             conv7 = tf_utils.relu(conv7, name='conv7_relu', is_print=True)
 
-            # conv8: (N, H/2, W/2, 64) -> (N, W, H, 3)
-            conv8 = tf_utils.deconv2d(conv7, self.image_size[2], k_h=4, k_w=4, name='conv8_deconv2d')
-            output = tf_utils.sigmoid(conv8, name='conv8_sigmoid', is_print=True)
+            # conv8: (N, H/2, W/2, 64) -> (N, W, H, ?)
+            conv8 = tf_utils.deconv2d(conv7, self.output_channel, k_h=4, k_w=4, name='conv8_deconv2d')
+            output = tf_utils.tanh(conv8, name='conv8_tanh', is_print=True)
 
             # set reuse=True for next call
             self.reuse = True

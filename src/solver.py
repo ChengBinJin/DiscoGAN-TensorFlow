@@ -124,10 +124,7 @@ class Solver(object):
         if np.mod(iter_time + 1, self.flags.save_freq) == 0:
             model_name = 'model'
             self.saver.save(self.sess, os.path.join(self.model_out_dir, model_name), global_step=iter_time)
-
-            print('=====================================')
-            print('             Model saved!            ')
-            print('=====================================\n')
+            print('[*] Model saved!')
 
     def load_model(self):
         print(' [*] Reading checkpoint...')
@@ -140,9 +137,7 @@ class Solver(object):
             meta_graph_path = ckpt.model_checkpoint_path + '.meta'
             self.iter_time = int(meta_graph_path.split('-')[-1].split('.')[0])
 
-            print('===========================')
-            print('   iter_time: {}'.format(self.iter_time))
-            print('===========================')
+            print('[*] Load iter_time: {}'.format(self.iter_time))
             return True
         else:
             return False
