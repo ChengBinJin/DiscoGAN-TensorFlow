@@ -5,3 +5,8 @@ src/edges2handbags
 src/handbags2shoes
 src/edges2shoes
 github_imgs
+src/jupyter/.ide
+src/jupyter/.ipynb_checkpoints
+src/jupyter/__pycache__
+src/jupyter/img/
+src/jupyter/*.avi
