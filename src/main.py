@@ -19,6 +19,7 @@ tf.flags.DEFINE_bool('is_train', True, 'training or inference mode, default: Tru
 tf.flags.DEFINE_float('learning_rate', 2e-4, 'initial learning rate for Adam, default: 0.0002')
 tf.flags.DEFINE_float('beta1', 0.5, 'beta1 momentum term of Adam, default: 0.5')
 tf.flags.DEFINE_float('beta2', 0.999, 'beta2 momentum term of Adam, default: 0.999')
+tf.flags.DEFINE_float('weight_decay', 1e-4, 'hyper-parameter for regularization term')
 
 tf.flags.DEFINE_integer('iters', 20, 'number of iterations, default: 200000')
 tf.flags.DEFINE_integer('print_freq', 2, 'print frequency for loss, default: 100')

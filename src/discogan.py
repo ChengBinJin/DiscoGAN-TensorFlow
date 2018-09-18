@@ -29,6 +29,8 @@ class DiscoGAN(object):
         self.lambda1, self.lambda2 = 10.0, 10.0
         self.ngf, self.ndf = 64, 64
         self.eps = 1e-12
+        self.start_decay_step = int(np.ceil(self.flags.iters / 2))  # for optimizer
+        self.decay_steps = self.flags.iters - self.start_decay_step
 
         self._G_gen_train_ops, self._F_gen_train_ops = [], []
         self._Dy_dis_train_ops, self._Dx_dis_train_ops = [], []
@@ -77,14 +79,26 @@ class DiscoGAN(object):
         # X -> Y
         self.fake_y_imgs = self.G_gen(self.x_imgs)
         self.G_gen_loss = self.generator_loss(self.Dy_dis, self.fake_y_imgs)
-        self.G_loss = self.G_gen_loss + cycle_loss
-        self.Dy_dis_loss = self.discriminator_loss(self.Dy_dis, self.y_imgs, self.fake_y_imgs)
+        # regularization term
+        self.G_reg = tf.reduce_sum(
+            [tf.nn.l2_loss(weight) for weight in tf.get_collection(key=tf.GraphKeys.TRAINABLE_VARIABLES, scope='G')])
+        self.Dy_dis_reg = tf.reduce_sum(
+            [tf.nn.l2_loss(weight) for weight in tf.get_collection(key=tf.GraphKeys.TRAINABLE_VARIABLES, scope='Dy')])
+        self.G_loss = self.G_gen_loss + cycle_loss + self.flags.weight_decay * self.G_reg
+        self.Dy_dis_loss = self.discriminator_loss(
+            self.Dy_dis, self.y_imgs, self.fake_y_imgs) + self.flags.weight_decay * self.Dy_dis_reg
 
         # Y -> X
         self.fake_x_imgs = self.F_gen(self.y_imgs)
         self.F_gen_loss = self.generator_loss(self.Dx_dis, self.fake_x_imgs)
-        self.F_loss = self.F_gen_loss + cycle_loss
-        self.Dx_dis_loss = self.discriminator_loss(self.Dx_dis, self.x_imgs, self.fake_x_imgs)
+        # regularization term
+        self.F_reg = tf.reduce_sum(
+            [tf.nn.l2_loss(weight) for weight in tf.get_collection(key=tf.GraphKeys.TRAINABLE_VARIABLES, scope='F')])
+        self.Dx_dis_reg = tf.reduce_sum(
+            [tf.nn.l2_loss(weight) for weight in tf.get_collection(key=tf.GraphKeys.TRAINABLE_VARIABLES, scope='Dx')])
+        self.F_loss = self.F_gen_loss + cycle_loss + self.flags.weight_decay * self.F_reg
+        self.Dx_dis_loss = self.discriminator_loss(
+            self.Dx_dis, self.x_imgs, self.fake_x_imgs) + self.flags.weight_decay * self.Dx_dis_reg
 
         G_optim = tf.train.AdamOptimizer(
             learning_rate=self.flags.learning_rate, beta1=self.flags.beta1, beta2=self.flags.beta2).minimize(
@@ -98,11 +112,34 @@ class DiscoGAN(object):
         Dx_optim = tf.train.AdamOptimizer(
             learning_rate=self.flags.learning_rate, beta1=self.flags.beta1, beta2=self.flags.beta2).minimize(
             self.Dx_dis_loss, var_list=self.Dx_dis.variables, name='Adam_Dx')
+        # G_optim = self.optimizer(loss=self.G_loss, variables=self.G_gen.variables, name='Adam_G')
+        # Dy_optim = self.optimizer(loss=self.Dy_dis_loss, variables=self.Dy_dis.variables, name='Adam_Dy')
+        # F_optim = self.optimizer(loss=self.F_loss, variables=self.F_gen.variables, name='Adam_F')
+        # Dx_optim = self.optimizer(loss=self.Dx_dis_loss, variables=self.Dx_dis.variables, name='Adam_Dx')
         self.optims = tf.group([G_optim, Dy_optim, F_optim, Dx_optim])
 
         # for sampling function
         self.fake_y_sample = self.G_gen(self.x_test_tfph)
         self.fake_x_sample = self.F_gen(self.y_test_tfph)
+
+    def optimizer(self, loss, variables, name='Adam'):
+        global_step = tf.Variable(0, trainable=False)
+        starter_learning_rate = self.flags.learning_rate
+        end_learning_rate = 0.
+        start_decay_step = self.start_decay_step
+        decay_steps = self.decay_steps
+
+        learning_rate = (tf.where(tf.greater_equal(global_step, start_decay_step),
+                                  tf.train.polynomial_decay(starter_learning_rate,
+                                                            global_step - start_decay_step,
+                                                            decay_steps, end_learning_rate, power=1.0),
+                                  starter_learning_rate))
+        tf.summary.scalar('learning_rate/{}'.format(name), learning_rate)
+
+        learn_step = tf.train.AdamOptimizer(learning_rate, beta1=self.flags.beta1, beta2=self.flags.beta2).\
+            minimize(loss, global_step=global_step, var_list=variables, name=name)
+
+        return learn_step
 
     def cycle_consistency_loss(self, x_imgs, y_imgs):
         # use mean squared error
