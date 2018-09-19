@@ -6,11 +6,11 @@
 # ---------------------------------------------------------
 import collections
 import numpy as np
-import matplotlib as mpl
+# import matplotlib as mpl
 import tensorflow as tf
-mpl.use('TkAgg')  # or whatever other backend that you want to solve Segmentation fault (core dumped)
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
+# mpl.use('TkAgg')  # or whatever other backend that you want to solve Segmentation fault (core dumped)
+# import matplotlib.pyplot as plt
+# import matplotlib.gridspec as gridspec
 
 import tensorflow_utils as tf_utils
 import utils as utils
@@ -37,6 +37,7 @@ class DiscoGAN(object):
 
         self._build_net()
         self._tensorboard()
+        self._cal_grid_size()
 
     def _build_net(self):
         if self.flags.dataset == 'handbags2shoes':
@@ -150,14 +151,28 @@ class DiscoGAN(object):
         loss = self.lambda1 * forward_loss + self.lambda2 * backward_loss
         return loss
 
-    def generator_loss(self, dis_obj, fake_img):
-        loss = -tf.reduce_mean(tf.log(dis_obj(fake_img) + self.eps))
+    @staticmethod
+    def generator_loss(dis_obj, fake_img):
+        # loss = -tf.reduce_mean(tf.log(dis_obj(fake_img) + self.eps))
+        _, d_logit_fake = dis_obj(fake_img)
+        loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=d_logit_fake,
+                                                                      labels=tf.ones_like(d_logit_fake)))
         return loss
 
-    def discriminator_loss(self, dis_obj, real_img, fake_img):
-        error_real = -tf.reduce_mean(tf.log(dis_obj(real_img) + self.eps))
-        error_fake = -tf.reduce_mean(tf.log(1. - dis_obj(fake_img) + self.eps))
-        loss = 0.5 * (error_real + error_fake)
+    @staticmethod
+    def discriminator_loss(dis_obj, real_img, fake_img):
+        # error_real = -tf.reduce_mean(tf.log(dis_obj(real_img) + self.eps))
+        # error_fake = -tf.reduce_mean(tf.log(1. - dis_obj(fake_img) + self.eps))
+        # loss = 0.5 * (error_real + error_fake)
+
+        _, d_logit_real = dis_obj(real_img)
+        _, d_logit_fake = dis_obj(fake_img)
+        d_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=d_logit_real,
+                                                                             labels=tf.ones_like(d_logit_real)))
+        d_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=d_logit_fake,
+                                                                             labels=tf.zeros_like(d_logit_fake)))
+        loss = d_loss_real + d_loss_fake
+
         return loss
 
     def _tensorboard(self):
@@ -219,37 +234,22 @@ class DiscoGAN(object):
             utils.print_metrics(iter_time, ord_output)
 
     def plots(self, imgs, iter_time, save_file):
-        # parameters for plot size
-        scale, margin = 0.02, 0.02
-        n_cols, n_rows = len(imgs), imgs[0].shape[0]
-        cell_size_h, cell_size_w = imgs[0].shape[1] * scale, imgs[0].shape[2] * scale
-
-        fig = plt.figure(figsize=(cell_size_w * n_cols, cell_size_h * n_rows))  # (column, row)
-        gs = gridspec.GridSpec(n_rows, n_cols)  # (row, column)
-        gs.update(wspace=margin, hspace=margin)
+        names = ['A', 'AB', 'B', 'BA']
+        canvas = len(imgs)
 
         # transform [-1., 1.] to [0., 1.]
         imgs = [utils.inverse_transform(imgs[idx]) for idx in range(len(imgs))]
 
         # save more bigger image
-        for col_index in range(n_cols):
-            for row_index in range(n_rows):
-                ax = plt.subplot(gs[row_index * n_cols + col_index])
-                plt.axis('off')
-                ax.set_xticklabels([])
-                ax.set_yticklabels([])
-                ax.set_aspect('equal')
-                if imgs[col_index][row_index].shape[2] == 1:  # gray scale
-                    img_2d = imgs[col_index][row_index]
-                    img_3d = np.dstack((img_2d, img_2d, img_2d))
-                    plt.imshow(img_3d.reshape(
-                        self.image_size[0], self.image_size[1], self.image_size[2]), cmap='Greys_r')
-                else:
-                    plt.imshow((imgs[col_index][row_index]).reshape(
-                        self.image_size[0], self.image_size[1], self.image_size[2]), cmap='Greys_r')
+        for canvas_idx in range(canvas):
+            utils.plots(imgs[canvas_idx], iter_time, save_file, self.grid_cols, self.grid_rows,
+                        self.flags.sample_batch, name=names[canvas_idx])
 
-        plt.savefig(save_file + '/sample_{}.png'.format(str(iter_time)), bbox_inches='tight')
-        plt.close(fig)
+    def _cal_grid_size(self, ruler=16):
+        while np.mod(self.flags.sample_batch, ruler) != 0:
+            ruler /= 2
+
+        self.grid_cols, self.grid_rows = int(ruler), int(self.flags.sample_batch / ruler)
 
 
 class Generator(object):
@@ -342,9 +342,10 @@ class Discriminator(object):
 
             # conv5: (N, H/16, W/16, 512) -> (N, H/16, W/16, 1)
             conv5 = tf_utils.conv2d(conv4, 1, k_h=4, k_w=4, d_h=1, d_w=1, padding='SAME', name='conv5_conv2d')
-            output = tf_utils.sigmoid(conv5)
+            # output = tf_utils.sigmoid(conv5)
 
             # set reuse=True for next call
             self.reuse = True
             self.variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.name)
-            return output
+
+            return tf_utils.sigmoid(conv5), conv5

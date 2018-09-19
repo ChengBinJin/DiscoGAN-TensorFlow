@@ -8,7 +8,11 @@ import os
 import sys
 import random
 import numpy as np
+import matplotlib as mpl
 import scipy.misc
+mpl.use('TkAgg')  # or whatever other backend that you want to solve Segmentation fault (core dumped)
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 from PIL import Image
 
 
@@ -166,3 +170,29 @@ def load_data(image_path, flip=True, is_test=False, which_direction=0, is_gray_s
         img_b = np.expand_dims(img_b, axis=2)
 
     return img_a, img_b
+
+
+def plots(imgs, iter_time, save_file, grid_cols, grid_rows, sample_batch, name=None):
+    # parameters for plot size
+    scale, margin = 0.02, 0.02
+
+    # save more bigger image
+    img_h, img_w, img_c = imgs.shape[1:]
+    fig = plt.figure(figsize=(img_w * grid_cols * scale, img_h * grid_rows * scale))  # (column, row)
+    gs = gridspec.GridSpec(grid_rows, grid_cols)  # (row, column)
+    gs.update(wspace=margin, hspace=margin)
+
+    for img_idx in range(sample_batch):
+        ax = plt.subplot(gs[img_idx])
+        plt.axis('off')
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.set_aspect('equal')
+
+        if imgs[img_idx].shape[2] == 1:  # gray scale
+            plt.imshow((imgs[img_idx]).reshape(img_h, img_w), cmap='Greys_r')
+        else:
+            plt.imshow((imgs[img_idx]).reshape(img_h, img_w, img_c), cmap='Greys_r')
+
+    plt.savefig(save_file + '/{}_{}.png'.format(str(iter_time), name), bbox_inches='tight')
+    plt.close(fig)
