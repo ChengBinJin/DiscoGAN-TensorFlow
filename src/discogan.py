@@ -205,18 +205,46 @@ class DiscoGAN(object):
 
     def sample_imgs(self):
         x_val, y_val = self.sess.run([self.x_imgs, self.y_imgs])
-        # minimum between batch_size and sample_batch
-        batch_size = np.minimum(self.flags.batch_size, self.flags.sample_batch)
-        batch_x, batch_y = x_val[:batch_size], y_val[:batch_size]
         fake_y, fake_x = self.sess.run([self.fake_y_sample, self.fake_x_sample],
-                                       feed_dict={self.x_test_tfph: batch_x, self.y_test_tfph: batch_y})
+                                       feed_dict={self.x_test_tfph: x_val, self.y_test_tfph: y_val})
+        fake_yxy, fake_xyx = self.sess.run([self.fake_y_sample, self.fake_x_sample],
+                                           feed_dict={self.x_test_tfph: fake_x, self.y_test_tfph: fake_y})
 
-        return [batch_x, fake_y, batch_y, fake_x]
+        names = ['A', 'AB', 'B', 'BA', 'ABA', 'BAB']
+        return [x_val, fake_y, y_val, fake_x, fake_xyx, fake_yxy], names
 
     def test_step(self, x_img, y_img):
         fake_y = self.sess.run(self.fake_y_sample, feed_dict={self.x_test_tfph: x_img})
         fake_x = self.sess.run(self.fake_x_sample, feed_dict={self.y_test_tfph: y_img})
+
         return [x_img, fake_y, y_img, fake_x]
+
+    def test_infinitely(self, input_type, count=5):
+        x_val, y_val = self.sess.run([self.x_imgs, self.y_imgs])
+
+        if input_type.upper() == 'A':
+            iterator = [self.G_gen(self.x_test_tfph), self.F_gen(self.y_test_tfph)] * count
+            input_img = x_val
+            add_name = ['B', 'A']
+            place_holder = [self.x_test_tfph, self.y_test_tfph]
+        elif input_type.upper() == 'B':
+            iterator = [self.F_gen(self.y_test_tfph), self.G_gen(self.x_test_tfph)] * count
+            input_img = y_val
+            add_name = ['A', 'B']
+            place_holder = [self.y_test_tfph, self.x_test_tfph]
+
+        else:
+            raise NotImplementedError
+
+        results = [input_img]
+        names = [input_type]
+        for step, model in enumerate(iterator):
+            names.append(names[-1] + add_name[np.mod(step, 2)])
+            output_img = self.sess.run(model, feed_dict={place_holder[np.mod(step, 2)]: input_img})
+            results.append(output_img)
+            input_img = output_img
+
+        return results, names
 
     def print_info(self, loss, iter_time):
         if np.mod(iter_time, self.flags.print_freq) == 0:
@@ -233,8 +261,7 @@ class DiscoGAN(object):
 
             utils.print_metrics(iter_time, ord_output)
 
-    def plots(self, imgs, iter_time, save_file):
-        names = ['A', 'AB', 'B', 'BA']
+    def plots(self, imgs, iter_time, save_file, names=None):
         canvas = len(imgs)
 
         # transform [-1., 1.] to [0., 1.]

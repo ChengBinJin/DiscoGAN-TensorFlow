@@ -84,6 +84,13 @@ class Solver(object):
                 self.save_model(self.iter_time)
                 self.iter_time += 1
 
+            # infinitely generate
+            imgs, names = self.model.test_infinitely(input_type='A', count=5)
+            self.model.plots(imgs, self.iter_time, self.sample_out_dir, names)
+
+            imgs, names = self.model.test_infinitely(input_type='B', count=5)
+            self.model.plots(imgs, self.iter_time, self.sample_out_dir, names)
+
             self.save_model(self.flags.iters)
         except KeyboardInterrupt:
             coord.request_stop()
@@ -117,8 +124,8 @@ class Solver(object):
 
     def sample(self, iter_time):
         if np.mod(iter_time, self.flags.sample_freq) == 0:
-            imgs = self.model.sample_imgs()
-            self.model.plots(imgs, iter_time, self.sample_out_dir)
+            imgs, names = self.model.sample_imgs()
+            self.model.plots(imgs, iter_time, self.sample_out_dir, names)
 
     def save_model(self, iter_time):
         if np.mod(iter_time + 1, self.flags.save_freq) == 0:
