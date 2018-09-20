@@ -256,8 +256,10 @@ class Generator(object):
     def __init__(self, name=None, ngf=64, norm='instance', output_channel=3, _ops=None):
         self.name = name
         self.ngf = ngf
-        self.norm = norm
         self.output_channel = output_channel
+        self.conv_dims = [self.ngf, 2*self.ngf, 4*self.ngf, 8*self.ngf]
+        self.deconv_dims = [4*self.ngf, 2*self.ngf, self.ngf]
+        self.norm = norm
         self._ops = _ops
         self.reuse = False
 
@@ -265,43 +267,27 @@ class Generator(object):
         with tf.variable_scope(self.name, reuse=self.reuse):
             tf_utils.print_activations(x)
 
-            # conv1: (N, H, W, C) -> (N, H/2, W/2, 64)
-            conv1 = tf_utils.conv2d(x, self.ngf, k_h=4, k_w=4, d_h=2, d_w=2, padding='SAME', name='conv1_conv2d')
-            conv1 = tf_utils.lrelu(conv1, name='conv1_lrelu', is_print=True)
+            # conv: (N, H, W, C) -> (N, H/2, W/2, 64)
+            output = tf_utils.conv2d(x, self.conv_dims[0], k_h=4, k_w=4, d_h=2, d_w=2, padding='SAME',
+                                     name='conv0_conv2d')
+            output = tf_utils.lrelu(output, name='conv0_lrelu', is_print=True)
 
-            # conv2: (N, H/2, W/2, 64) -> (N, H/4, W/4, 128)
-            conv2 = tf_utils.conv2d(conv1, 2*self.ngf, k_h=4, k_w=4, d_h=2, d_w=2, padding='SAME', name='conv2_conv2d')
-            conv2 = tf_utils.norm(conv2, _type='batch', _ops=self._ops, name='conv2_norm')
-            conv2 = tf_utils.lrelu(conv2, name='conv2_lrelu', is_print=True)
+            for idx, conv_dim in enumerate(self.conv_dims[1:]):
+                # conv: (N, H/2, W/2, C) -> (N, H/4, W/4, 2C)
+                output = tf_utils.conv2d(output, conv_dim, k_h=4, k_w=4, d_h=2, d_w=2, padding='SAME',
+                                         name='conv{}_conv2d'.format(idx+1))
+                output = tf_utils.norm(output, _type='batch', _ops=self._ops, name='conv{}_norm'.format(idx+1))
+                output = tf_utils.lrelu(output, name='conv{}_lrelu'.format(idx+1), is_print=True)
 
-            # conv3: (N, H/4, W/4, 128) -> (N, H/8, W/8, 256)
-            conv3 = tf_utils.conv2d(conv2, 4*self.ngf, k_h=4, k_w=4, d_h=2, d_w=2, padding='SAME', name='conv3_conv2d')
-            conv3 = tf_utils.norm(conv3, _type='batch', _ops=self._ops, name='conv3_norm')
-            conv3 = tf_utils.lrelu(conv3, name='conv3_lrelu', is_print=True)
+            for idx, deconv_dim in enumerate(self.deconv_dims):
+                # deconv: (N, H/16, W/16, C) -> (N, W/8, H/8, C/2)
+                output = tf_utils.deconv2d(output, deconv_dim, k_h=4, k_w=4, name='deconv{}_conv2d'.format(idx))
+                output = tf_utils.norm(output, _type='batch', _ops=self._ops, name='deconv{}_norm'.format(idx))
+                output = tf_utils.relu(output, name='deconv{}_relu'.format(idx), is_print=True)
 
-            # conv4: (N, H/8, W/8, 256) -> (N, H/16, W/16, 512)
-            conv4 = tf_utils.conv2d(conv3, 8*self.ngf, k_h=4, k_w=4, d_h=2, d_w=2, padding='SAME', name='conv4_conv2d')
-            conv4 = tf_utils.norm(conv4, _type='batch', _ops=self._ops, name='conv4_norm')
-            conv4 = tf_utils.lrelu(conv4, name='conv4_lrelu', is_print=True)
-
-            # conv5: (N, H/16, W/16, 512) -> (N, H/8, W/8, 256)
-            conv5 = tf_utils.deconv2d(conv4, 4*self.ngf, k_h=4, k_w=4, name='conv5_deconv2d')
-            conv5 = tf_utils.norm(conv5, _type='batch', _ops=self._ops, name='conv5_norm')
-            conv5 = tf_utils.relu(conv5, name='conv5_relu', is_print=True)
-
-            # conv6: (N, H/8, W/8, 256) -> (N, H/4, W/4, 128)
-            conv6 = tf_utils.deconv2d(conv5, 2*self.ngf, k_h=4, k_w=4, name='conv6_deconv2d')
-            conv6 = tf_utils.norm(conv6, _type='batch', _ops=self._ops, name='conv6_norm')
-            conv6 = tf_utils.relu(conv6, name='conv6_relu', is_print=True)
-
-            # conv7: (N, H/4, W/4, 128) -> (N, H/2, W/2, 64)
-            conv7 = tf_utils.deconv2d(conv6, self.ngf, k_h=4, k_w=4, name='conv7_deconv2d')
-            conv7 = tf_utils.norm(conv7, _type='batch', _ops=self._ops, name='conv7_norm')
-            conv7 = tf_utils.relu(conv7, name='conv7_relu', is_print=True)
-
-            # conv8: (N, H/2, W/2, 64) -> (N, W, H, ?)
-            conv8 = tf_utils.deconv2d(conv7, self.output_channel, k_h=4, k_w=4, name='conv8_deconv2d')
-            output = tf_utils.tanh(conv8, name='conv8_tanh', is_print=True)
+            # conv: (N, H/2, W/2, 64) -> (N, W, H, 3)
+            output = tf_utils.deconv2d(output, self.output_channel, k_h=4, k_w=4, name='conv3_deconv2d')
+            output = tf_utils.tanh(output, name='conv4_tanh', is_print=True)
 
             # set reuse=True for next call
             self.reuse = True
@@ -313,6 +299,7 @@ class Discriminator(object):
     def __init__(self, name=None, ndf=64, norm='instance', _ops=None):
         self.name = name
         self.ndf = ndf
+        self.hidden_dims = [self.ndf, 2*self.ndf, 4*self.ndf, 8*self.ndf]
         self.norm = norm
         self._ops = _ops
         self.reuse = False
@@ -321,31 +308,22 @@ class Discriminator(object):
         with tf.variable_scope(self.name, reuse=self.reuse):
             tf_utils.print_activations(x)
 
-            # conv1: (N, H, W, 3) -> (N, H/2, W/2, 64)
-            conv1 = tf_utils.conv2d(x, self.ndf, k_h=4, k_w=4, d_h=2, d_w=2, padding='SAME', name='conv1_conv2d')
-            conv1 = tf_utils.lrelu(conv1, name='conv1_lrelu', is_print=True)
+            # conv: (N, H, W, 3) -> (N, H/2, W/2, 64)
+            output = tf_utils.conv2d(x, self.ndf, k_h=4, k_w=4, d_h=2, d_w=2, padding='SAME', name='conv0_conv2d')
+            output = tf_utils.lrelu(output, name='conv0_lrelu', is_print=True)
 
-            # conv2: (N, H/2, W/2, 64) -> (N, H/4, W/4, 128)
-            conv2 = tf_utils.conv2d(conv1, 2*self.ndf, k_h=4, k_w=4, d_h=2, d_w=2, padding='SAME', name='conv2_conv2d')
-            conv2 = tf_utils.norm(conv2, _type='batch', _ops=self._ops, name='conv2_norm')
-            conv2 = tf_utils.lrelu(conv2, name='conv2_lrelu', is_print=True)
+            for idx, hidden_dim in enumerate(self.hidden_dims[1:]):
+                # conv: (N, H/2, W/2, C) -> (N, H/4, W/4, C/2)
+                output = tf_utils.conv2d(output, hidden_dim, k_h=4, k_w=4, d_h=2, d_w=2, padding='SAME',
+                                         name='conv{}_conv2d'.format(idx+1))
+                output = tf_utils.norm(output, _type='batch', _ops=self._ops, name='conv{}_norm'.format(idx+1))
+                output = tf_utils.lrelu(output, name='conv{}_lrelu'.format(idx+1), is_print=True)
 
-            # conv3: (N, H/4, W/4, 128) -> (N, H/8, W/8, 256)
-            conv3 = tf_utils.conv2d(conv2, 4*self.ndf, k_h=4, k_w=4, d_h=2, d_w=2, padding='SAME', name='conv3_conv2d')
-            conv3 = tf_utils.norm(conv3, _type='batch', _ops=self._ops, name='con3_norm')
-            conv3 = tf_utils.lrelu(conv3, name='conv3_lrelu', is_print=True)
-
-            # conv4: (N, H/8, W/8, 256) -> (N, H/16, W/16, 512)
-            conv4 = tf_utils.conv2d(conv3, 8*self.ndf, k_h=4, k_w=4, d_h=2, d_w=2, padding='SAME', name='conv4_conv2d')
-            conv4 = tf_utils.norm(conv4, _type='batch', _ops=self._ops, name='conv4_norm')
-            conv4 = tf_utils.lrelu(conv4, name='conv4_lrelu', is_print=True)
-
-            # conv5: (N, H/16, W/16, 512) -> (N, H/16, W/16, 1)
-            conv5 = tf_utils.conv2d(conv4, 1, k_h=4, k_w=4, d_h=1, d_w=1, padding='SAME', name='conv5_conv2d')
-            # output = tf_utils.sigmoid(conv5)
+            # conv: (N, H/16, W/16, 512) -> (N, H/16, W/16, 1)
+            output = tf_utils.conv2d(output, 1, k_h=4, k_w=4, d_h=1, d_w=1, padding='SAME', name='conv4_conv2d')
 
             # set reuse=True for next call
             self.reuse = True
             self.variables = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.name)
 
-            return tf_utils.sigmoid(conv5), conv5
+            return tf_utils.sigmoid(output), output
