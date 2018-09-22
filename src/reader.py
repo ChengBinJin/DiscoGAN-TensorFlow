@@ -10,11 +10,12 @@ import time
 
 class Reader(object):
     def __init__(self, file_path, image_size=(64, 64, 3), min_queue_examples=100, batch_size=1, num_threads=8,
-                 side='left', name=None):
+                 side='left', ori_image_size=(256, 512, 3), name=None):
         self.file_path = file_path
         self.image_size = image_size
         self.factor = 1.05
-        self.ori_image_size = (256, 256, 3)
+        # (256, 512, 3) to (256, 256, 3)
+        self.ori_image_size = (ori_image_size[0], ori_image_size[0], ori_image_size[2])
         self.bigger_size = [int(np.ceil(self.ori_image_size[0] * self.factor)),
                             int(np.ceil(self.ori_image_size[1] * self.factor))]
         self.min_queue_examples = min_queue_examples
@@ -39,11 +40,15 @@ class Reader(object):
 
     def _preprocess(self, image):
         if self.side == 'left':
+            print('self.ori_image_size: {}'.format(self.ori_image_size))
             image = tf.image.crop_to_bounding_box(image, offset_height=0, offset_width=0,
-                                                  target_height=256, target_width=256)
+                                                  target_height=self.ori_image_size[0],
+                                                  target_width=int(self.ori_image_size[1]))
         elif self.side == 'right':
-            image = tf.image.crop_to_bounding_box(image, offset_height=0, offset_width=256,
-                                                  target_height=256, target_width=256)
+            print('self.ori_image_size: {}'.format(self.ori_image_size))
+            image = tf.image.crop_to_bounding_box(image, offset_height=0, offset_width=int(self.ori_image_size[1]),
+                                                  target_height=self.ori_image_size[0],
+                                                  target_width=self.ori_image_size[1])
         else:
             raise NotImplementedError
 

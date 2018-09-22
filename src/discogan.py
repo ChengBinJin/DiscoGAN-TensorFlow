@@ -19,10 +19,11 @@ from reader import Reader
 
 # noinspection PyPep8Naming
 class DiscoGAN(object):
-    def __init__(self, sess, flags, image_size, data_path):
+    def __init__(self, sess, flags, image_size, ori_image_size, data_path):
         self.sess = sess
         self.flags = flags
         self.image_size = image_size
+        self.ori_image_size = ori_image_size
         self.x_path, self.y_path = data_path[0], data_path[1]
 
         self.norm = 'instance'
@@ -40,13 +41,17 @@ class DiscoGAN(object):
         self._cal_grid_size()
 
     def _build_net(self):
-        if self.flags.dataset == 'handbags2shoes':
+        if (self.flags.dataset == 'edges2handbags') or (self.flags.dataset == 'edges2shoes'):
+            side_1, side_2 = 'left', 'right'
+            self.input_channel = 1
+            self.output_channel = 3
+        elif self.flags.dataset == 'handbags2shoes':
             side_1, side_2 = 'right', 'right'
             self.input_channel = 3
             self.output_channel = 3
         else:
             side_1, side_2 = 'left', 'right'
-            self.input_channel = 1
+            self.input_channel = 3
             self.output_channel = 3
 
         # tfph: tensorflow placeholder
@@ -63,9 +68,9 @@ class DiscoGAN(object):
         self.Dx_dis = Discriminator(name='Dx', ndf=self.ndf, norm=self.norm, _ops=self._Dx_dis_train_ops)
 
         x_reader = Reader(self.x_path, name='X', image_size=self.image_size, batch_size=self.flags.batch_size,
-                          side=side_1)
+                          side=side_1, ori_image_size=self.ori_image_size)
         y_reader = Reader(self.y_path, name='Y', image_size=self.image_size, batch_size=self.flags.batch_size,
-                          side=side_2)
+                          side=side_2, ori_image_size=self.ori_image_size)
 
         if self.input_channel == 1:
             imgs = x_reader.feed()
@@ -101,22 +106,22 @@ class DiscoGAN(object):
             [tf.nn.l2_loss(weight) for weight in tf.get_collection(key=tf.GraphKeys.TRAINABLE_VARIABLES, scope='Dx')])
         self.Dx_loss = self.Dx_dis_loss + self.Dx_dis_reg
 
-        G_optim = tf.train.AdamOptimizer(
-            learning_rate=self.flags.learning_rate, beta1=self.flags.beta1, beta2=self.flags.beta2).minimize(
-            self.G_loss, var_list=self.G_gen.variables, name='Adam_G')
-        Dy_optim = tf.train.AdamOptimizer(
-            learning_rate=self.flags.learning_rate, beta1=self.flags.beta1, beta2=self.flags.beta2).minimize(
-            self.Dy_loss, var_list=self.Dy_dis.variables, name='Adam_Dy')
-        F_optim = tf.train.AdamOptimizer(
-            learning_rate=self.flags.learning_rate, beta1=self.flags.beta1, beta2=self.flags.beta2).minimize(
-            self.F_loss, var_list=self.F_gen.variables, name='Adam_F')
-        Dx_optim = tf.train.AdamOptimizer(
-            learning_rate=self.flags.learning_rate, beta1=self.flags.beta1, beta2=self.flags.beta2).minimize(
-            self.Dx_loss, var_list=self.Dx_dis.variables, name='Adam_Dx')
-        # G_optim = self.optimizer(loss=self.G_loss, variables=self.G_gen.variables, name='Adam_G')
-        # Dy_optim = self.optimizer(loss=self.Dy_dis_loss, variables=self.Dy_dis.variables, name='Adam_Dy')
-        # F_optim = self.optimizer(loss=self.F_loss, variables=self.F_gen.variables, name='Adam_F')
-        # Dx_optim = self.optimizer(loss=self.Dx_dis_loss, variables=self.Dx_dis.variables, name='Adam_Dx')
+        # G_optim = tf.train.AdamOptimizer(
+        #     learning_rate=self.flags.learning_rate, beta1=self.flags.beta1, beta2=self.flags.beta2).minimize(
+        #     self.G_loss, var_list=self.G_gen.variables, name='Adam_G')
+        # Dy_optim = tf.train.AdamOptimizer(
+        #     learning_rate=self.flags.learning_rate, beta1=self.flags.beta1, beta2=self.flags.beta2).minimize(
+        #     self.Dy_loss, var_list=self.Dy_dis.variables, name='Adam_Dy')
+        # F_optim = tf.train.AdamOptimizer(
+        #     learning_rate=self.flags.learning_rate, beta1=self.flags.beta1, beta2=self.flags.beta2).minimize(
+        #     self.F_loss, var_list=self.F_gen.variables, name='Adam_F')
+        # Dx_optim = tf.train.AdamOptimizer(
+        #     learning_rate=self.flags.learning_rate, beta1=self.flags.beta1, beta2=self.flags.beta2).minimize(
+        #     self.Dx_loss, var_list=self.Dx_dis.variables, name='Adam_Dx')
+        G_optim = self.optimizer(loss=self.G_loss, variables=self.G_gen.variables, name='Adam_G')
+        Dy_optim = self.optimizer(loss=self.Dy_dis_loss, variables=self.Dy_dis.variables, name='Adam_Dy')
+        F_optim = self.optimizer(loss=self.F_loss, variables=self.F_gen.variables, name='Adam_F')
+        Dx_optim = self.optimizer(loss=self.Dx_dis_loss, variables=self.Dx_dis.variables, name='Adam_Dx')
         self.optims = tf.group([G_optim, Dy_optim, F_optim, Dx_optim])
 
         # for sampling function
@@ -192,13 +197,16 @@ class DiscoGAN(object):
         self.summary_op = tf.summary.merge_all()
 
     def train_step(self):
-        ops_0 = [self.optims, self.G_loss, self.F_loss, self.Dy_loss, self.Dx_loss, self.summary_op]
-        ops_1 = [self.G_gen_loss, self.G_reg, self.F_gen_loss, self.F_reg, self.cycle_loss, self.Dy_dis_loss,
-                 self.Dy_dis_reg, self.Dx_dis_loss, self.Dx_dis_reg]
+        ops = [self.optims, self.G_loss, self.F_loss, self.Dy_loss, self.Dx_loss, self.summary_op, self.G_gen_loss,
+               self.G_reg, self.F_gen_loss, self.F_reg, self.cycle_loss, self.Dy_dis_loss, self.Dy_dis_reg,
+               self.Dx_dis_loss, self.Dx_dis_reg]
+        # ops_1 = [self.G_gen_loss, self.G_reg, self.F_gen_loss, self.F_reg, self.cycle_loss, self.Dy_dis_loss,
+        #          self.Dy_dis_reg, self.Dx_dis_loss, self.Dx_dis_reg]
 
-        _, G_loss, F_loss, Dy_loss, Dx_loss, summary = self.sess.run(ops_0)
-        G_gen_loss, G_reg, F_gen_loss, F_reg, cycle_loss, Dy_dis_loss, Dy_dis_reg, Dx_dis_loss, Dx_dis_reg = \
-            self.sess.run(ops_1)
+        _, G_loss, F_loss, Dy_loss, Dx_loss, summary, G_gen_loss, G_reg, F_gen_loss, F_reg, cycle_loss, Dy_dis_loss, \
+        Dy_dis_reg, Dx_dis_loss, Dx_dis_reg = self.sess.run(ops)
+        # G_gen_loss, G_reg, F_gen_loss, F_reg, cycle_loss, Dy_dis_loss, Dy_dis_reg, Dx_dis_loss, Dx_dis_reg = \
+        #     self.sess.run(ops_1)
 
         return [G_loss, G_gen_loss, G_reg, F_loss, F_gen_loss, F_reg, cycle_loss, Dy_loss, Dy_dis_loss, Dy_dis_reg,
                 Dx_loss, Dx_dis_loss, Dx_dis_reg], summary
@@ -214,10 +222,18 @@ class DiscoGAN(object):
         return [x_val, fake_y, y_val, fake_x, fake_xyx, fake_yxy], names
 
     def test_step(self, x_img, y_img):
-        fake_y = self.sess.run(self.fake_y_sample, feed_dict={self.x_test_tfph: x_img})
-        fake_x = self.sess.run(self.fake_x_sample, feed_dict={self.y_test_tfph: y_img})
+        if self.input_channel == 1:
+            x_img = x_img[:, :, :, 1:2]
+        else:
+            x_img = x_img
 
-        return [x_img, fake_y, y_img, fake_x]
+        fake_y, fake_x = self.sess.run([self.fake_y_sample, self.fake_x_sample],
+                                       feed_dict={self.x_test_tfph: x_img, self.y_test_tfph: y_img})
+        fake_yxy, fake_xyx = self.sess.run([self.fake_y_sample, self.fake_x_sample],
+                                           feed_dict={self.x_test_tfph: fake_x, self.y_test_tfph: fake_y})
+
+        names = ['A', 'AB', 'B', 'BA', 'ABA', 'BAB']
+        return [x_img, fake_y, y_img, fake_x, fake_xyx, fake_yxy], names
 
     def test_infinitely(self, input_type, count=5):
         x_val, y_val = self.sess.run([self.x_imgs, self.y_imgs])

@@ -22,7 +22,8 @@ class Solver(object):
 
         self.flags = flags
         self.dataset = Dataset(self.flags.dataset, self.flags)
-        self.model = DiscoGAN(self.sess, self.flags, self.dataset.image_size, self.dataset())
+        self.model = DiscoGAN(self.sess, self.flags, self.dataset.image_size, self.dataset.ori_image_size,
+                              self.dataset())
 
         self._make_folders()
         self.iter_time = 0
@@ -107,20 +108,29 @@ class Solver(object):
         else:
             print(' [!] Load Failed...')
 
-        total_time = 0.
-        num_iters = self.dataset.data_x.shape[0]
-        for iter_time in range(0, num_iters, self.flags.sample_batch):
-            print('iter_time: {}'.format(iter_time))
-            img_x = self.dataset.data_x[iter_time:iter_time+self.flags.sample_batch]
-            img_y = self.dataset.data_y[iter_time:iter_time+self.flags.sample_batch]
+        # threads for tfrecord
+        coord = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(sess=self.sess, coord=coord)
 
-            # measure inference time
-            start_time = time.time()
-            imgs = self.model.test_step(img_x, img_y)  # inference
-            total_time += time.time() - start_time
-            self.model.plots(imgs, iter_time, self.test_out_dir)
+        try:
+            num_iters = 20
+            for iter_time in range(num_iters):
+                print('iter_time: {}'.format(iter_time))
 
-        print('Avg PT: {:.2f} msec.'.format(total_time / num_iters * 1000.))
+                # infinitely generate
+                imgs, names = self.model.test_infinitely(input_type='A', count=3)
+                self.model.plots(imgs, iter_time, self.test_out_dir, names)
+                imgs, names = self.model.test_infinitely(input_type='B', count=3)
+                self.model.plots(imgs, iter_time, self.test_out_dir, names)
+
+        except KeyboardInterrupt:
+            coord.request_stop()
+        except Exception as e:
+            coord.request_stop(e)
+        finally:
+            # when done, ask the threads to stop
+            coord.request_stop()
+            coord.join(threads)
 
     def sample(self, iter_time):
         if np.mod(iter_time, self.flags.sample_freq) == 0:

@@ -14,7 +14,10 @@ class Original(object):
         self.flags = flags
         self.dataset_name = flags.dataset
         self.image_size = (64, 64, 3)
-        self.ori_image_size = (256, 512, 3)
+        if self.flags.dataset == 'edges2shoes' or self.flags.dataset == 'edges2handbags':
+            self.ori_image_size = (256, 512, 3)
+        elif self.flags.dataset == 'maps':
+            self.ori_image_size = (600, 1200, 3)
 
         self.train_path = '../../Data/{}/train'.format(self.dataset_name)
         self.val_path = '../../Data/{}/val'.format(self.dataset_name)
@@ -32,7 +35,7 @@ class Original(object):
         val_path = utils.all_files_under(self.val_path)
         for path in val_path:
             x, y = utils.load_data(path, flip=False, is_test=True, is_gray_scale=False,
-                                   transform_type='positive', img_size=self.ori_image_size)
+                                   transform_type='zero_center', img_size=self.ori_image_size)
             # scipy.misc.imresize reutrns uint8 type
             x = cv2.resize(x, dsize=None, fx=0.25, fy=0.25)  # (256, 256, 3) to (64, 64, 3)
             y = cv2.resize(y, dsize=None, fx=0.25, fy=0.25)  # (256, 256, 3) to (64, 64, 3)
@@ -74,14 +77,14 @@ class Bags2Shoes(object):
         # read bags data
         for bag_path in bags_val_path:
             _, bag = utils.load_data(bag_path, flip=False, is_test=True, is_gray_scale=False,
-                                     transform_type='positive', img_size=self.ori_image_size)
+                                     transform_type='zero_center', img_size=self.ori_image_size)
             # scipy.misc.imresize reutrns uint8 type
             bag = cv2.resize(bag, dsize=None, fx=0.25, fy=0.25)  # (256, 256, 3) to (64, 64, 3)
             bags.append(bag)
 
         for shoes_path in shoes_val_path:
             _, shoes = utils.load_data(shoes_path, flip=False, is_test=True, is_gray_scale=False,
-                                       transform_type='positive', img_size=self.ori_image_size)
+                                       transform_type='zero_center', img_size=self.ori_image_size)
             # scipy.misc.imresize reutrns uint8 type
             shoes = cv2.resize(shoes, dsize=None, fx=0.25, fy=0.25)  # (256, 256, 3) to (64, 64, 3)
             shoeses.append(shoes)
@@ -92,7 +95,7 @@ class Bags2Shoes(object):
 
 # noinspection PyPep8Naming
 def Dataset(dataset_name, flags):
-    if dataset_name == 'edges2handbags' or dataset_name == 'edges2shoes':
+    if dataset_name == 'edges2handbags' or dataset_name == 'edges2shoes' or dataset_name == 'maps':
         return Original(flags)
     elif dataset_name == 'handbags2shoes':
         return Bags2Shoes(flags)
