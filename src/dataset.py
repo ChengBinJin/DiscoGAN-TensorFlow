@@ -14,7 +14,8 @@ class Original(object):
         self.flags = flags
         self.dataset_name = flags.dataset
         self.image_size = (64, 64, 3)
-        if self.flags.dataset == 'edges2shoes' or self.flags.dataset == 'edges2handbags':
+        if self.flags.dataset == 'edges2shoes' or self.flags.dataset == 'edges2handbags' or \
+                self.flags.dataset == 'cityscapes' or self.flags.dataset == 'facades':
             self.ori_image_size = (256, 512, 3)
         elif self.flags.dataset == 'maps':
             self.ori_image_size = (600, 1200, 3)
@@ -95,9 +96,10 @@ class Bags2Shoes(object):
 
 # noinspection PyPep8Naming
 def Dataset(dataset_name, flags):
-    if dataset_name == 'edges2handbags' or dataset_name == 'edges2shoes' or dataset_name == 'maps':
-        return Original(flags)
-    elif dataset_name == 'handbags2shoes':
+    if dataset_name == 'handbags2shoes':
         return Bags2Shoes(flags)
+    elif dataset_name == 'edges2handbags' or dataset_name == 'edges2shoes' or dataset_name == 'maps' or \
+            dataset_name == 'cityscapes' or dataset_name == 'facades':
+        return Original(flags)
     else:
         raise NotImplementedError

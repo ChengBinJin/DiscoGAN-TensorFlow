@@ -4,7 +4,6 @@
 # Email: sbkim0407@gmail.com
 # ---------------------------------------------------------
 import os
-import time
 import numpy as np
 import tensorflow as tf
 from datetime import datetime
@@ -113,7 +112,7 @@ class Solver(object):
         threads = tf.train.start_queue_runners(sess=self.sess, coord=coord)
 
         try:
-            num_iters = 20
+            num_iters = 1
             for iter_time in range(num_iters):
                 print('iter_time: {}'.format(iter_time))
 
