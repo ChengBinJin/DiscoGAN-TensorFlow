@@ -1,3 +1,4 @@
+# ---------------------------------------------------------
 # Tensorflow DiscoGAN Implementation
 # Licensed under The MIT License [see LICENSE for details]
 # Written by Cheng-Bin Jin
@@ -112,7 +113,7 @@ class Solver(object):
         threads = tf.train.start_queue_runners(sess=self.sess, coord=coord)
 
         try:
-            num_iters = 1
+            num_iters = 20
             for iter_time in range(num_iters):
                 print('iter_time: {}'.format(iter_time))
 
