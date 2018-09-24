@@ -26,7 +26,7 @@ class DiscoGAN(object):
         self.ori_image_size = ori_image_size
         self.x_path, self.y_path = data_path[0], data_path[1]
 
-        self.norm = 'instance'
+        self.norm = 'batch'
         self.lambda1, self.lambda2 = 1.0, 1.0
         self.ngf, self.ndf = 64, 64
         self.eps = 1e-12
@@ -319,13 +319,13 @@ class Generator(object):
                 # conv: (N, H/2, W/2, C) -> (N, H/4, W/4, 2C)
                 output = tf_utils.conv2d(output, conv_dim, k_h=4, k_w=4, d_h=2, d_w=2, padding='SAME',
                                          name='conv{}_conv2d'.format(idx+1))
-                output = tf_utils.norm(output, _type='batch', _ops=self._ops, name='conv{}_norm'.format(idx+1))
+                output = tf_utils.norm(output, _type=self.norm, _ops=self._ops, name='conv{}_norm'.format(idx+1))
                 output = tf_utils.lrelu(output, name='conv{}_lrelu'.format(idx+1), is_print=True)
 
             for idx, deconv_dim in enumerate(self.deconv_dims):
                 # deconv: (N, H/16, W/16, C) -> (N, W/8, H/8, C/2)
                 output = tf_utils.deconv2d(output, deconv_dim, k_h=4, k_w=4, name='deconv{}_conv2d'.format(idx))
-                output = tf_utils.norm(output, _type='batch', _ops=self._ops, name='deconv{}_norm'.format(idx))
+                output = tf_utils.norm(output, _type=self.norm, _ops=self._ops, name='deconv{}_norm'.format(idx))
                 output = tf_utils.relu(output, name='deconv{}_relu'.format(idx), is_print=True)
 
             # conv: (N, H/2, W/2, 64) -> (N, W, H, 3)
@@ -359,7 +359,7 @@ class Discriminator(object):
                 # conv: (N, H/2, W/2, C) -> (N, H/4, W/4, C/2)
                 output = tf_utils.conv2d(output, hidden_dim, k_h=4, k_w=4, d_h=2, d_w=2, padding='SAME',
                                          name='conv{}_conv2d'.format(idx+1))
-                output = tf_utils.norm(output, _type='batch', _ops=self._ops, name='conv{}_norm'.format(idx+1))
+                output = tf_utils.norm(output, _type=self.norm, _ops=self._ops, name='conv{}_norm'.format(idx+1))
                 output = tf_utils.lrelu(output, name='conv{}_lrelu'.format(idx+1), is_print=True)
 
             # conv: (N, H/16, W/16, 512) -> (N, H/16, W/16, 1)
