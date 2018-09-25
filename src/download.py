@@ -28,12 +28,12 @@ with tarfile.open('./maps.tar.gz') as tar:
     tar.close()
 
 with tarfile.open('./cityscapes.tar.gz') as tar:
-	tar.extractall()
-	tar.close()
+    tar.extractall()
+    tar.close()
 
 with tarfile.open('./facades.tar.gz') as tar:
-	tar.extractall()
-	tar.close()
+    tar.extractall()
+    tar.close()
 
 os.remove('./edges2handbags.tar.gz')
 os.remove('./edges2shoes.tar.gz')
