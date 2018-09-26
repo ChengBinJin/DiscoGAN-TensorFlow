@@ -13,3 +13,5 @@ src/jupyter/.ipynb_checkpoints
 src/jupyter/__pycache__
 src/jupyter/img/
 src/jupyter/*.avi
+src/jupyter/*.gif
+github_imgs/
